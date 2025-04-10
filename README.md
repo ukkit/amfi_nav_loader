@@ -29,11 +29,22 @@ A Python-based system for automating the download, parsing, and storage of mutua
 
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/ukkit/amfi_nav_loader
    cd amfi_nav_loader
    ```
 
-2. Build and start the Docker containers:
+2. Create .env from .env.sample and enter database details:
+   ```bash
+   cp .env.sample .env
+   MYSQL_ROOT_PASSWORD=example_root_password
+   MYSQL_DATABASE=name_of_mysql_database   
+   MYSQL_USER=username_for_mysql_database
+   MYSQL_PASSWORD=password_for_mysql_database
+   IN_MYSQL_PORT=3306  # Specify the incoming MySQL port
+   OUT_MYSQL_PORT=3306  # Specify the outgoing MySQL port
+   ```
+
+3. Build and start the Docker containers:
    ```bash
    docker-compose up -d
    ```
@@ -43,18 +54,18 @@ A Python-based system for automating the download, parsing, and storage of mutua
    - Start the Adminer interface container
    - Set up the required volumes for data persistence
 
-3. Access the Adminer interface:
+4. Access the Adminer interface:
    - Open your browser and go to `http://localhost:8080`
    - Login with the following credentials:
      - System: MySQL
-     - Server: db
-     - Username: root
-     - Password: (as specified in docker-compose.yml)
-     - Database: nav_data
+     - Server: mysqldb
+     - Username: as_defined_in_.env_file
+     - Password: as_defined_in_.env_file
+     - Database: as_defined_in_.env_file
 
-4. Initialize the database:
+5. Initialize the database:
    ```bash
-   docker-compose exec app python -c "from app.db.insert_nav import init_database; init_database()"
+   docker-compose exec app python -c "from db.insert_nav import init_database; init_database()"
    ```
 
 ## Usage
@@ -83,15 +94,6 @@ The script supports three modes of operation:
    - Process and store the data
    - Provide a summary of the operation
 
-3. **Yearly Update** (with --yearly argument):
-   ```bash
-   docker-compose exec app python main.py --yearly 5
-   ```
-   This will:
-   - Download data for the specified number of years
-   - Process and store the data
-   - Provide a summary of the operation
-
 ### Examples
 
 1. Run daily update:
@@ -102,11 +104,6 @@ The script supports three modes of operation:
 2. Run monthly update for past 6 months:
    ```bash
    docker-compose exec app python main.py --months 6
-   ```
-
-3. Run yearly update for past 10 years:
-   ```bash
-   docker-compose exec app python main.py --yearly 1
    ```
 
 ## Directory Structure
@@ -126,6 +123,7 @@ amfi_nav_loader/
 ├── logs/
 │   ├── monthly_job.log
 │   └── error_log.txt
+├── .env.sample
 ├── docker-compose.yml
 ├── Dockerfile
 └── requirements.txt
