@@ -1,3 +1,4 @@
+import argparse
 from downloader.download_nav import download_nav_file_for_date, get_latest_business_day, bulk_download_past_years, bulk_download_past_months
 from parser.parse_nav import parse_nav_file
 from db.insert_nav import insert_nav, get_earliest_nav_date
@@ -5,6 +6,7 @@ from datetime import datetime, timedelta
 import logging
 import os
 import glob
+import sys
 
 # Configure logging
 logging.basicConfig(
@@ -17,16 +19,40 @@ logging.basicConfig(
 )
 
 def run_daily_job():
+    """
+    Run the daily job to download and process the latest NAV data.
+    """
+    start_time = datetime.now()
+    logging.info("Starting daily job")
+    
     try:
-        date = get_latest_business_day(datetime.now())
-        file_path = download_nav_file_for_date(date)
+        # Get the latest business day
+        latest_date = get_latest_business_day(datetime.now())
+        
+        # Download NAV file
+        file_path = f"data/navall_{latest_date.strftime('%Y-%m-%d')}.txt"
+        if not os.path.exists(file_path):
+            download_nav_file_for_date(latest_date)
+        
+        # Process the file
         df = parse_nav_file(file_path)
-        df.to_csv("nav_data.csv", index=False)
-        insert_nav(df)
-        print("NAV data updated successfully.")
+        if df is not None and not df.empty:
+            # Save parsed data to CSV
+            csv_path = file_path.replace('.txt', '.csv')
+            df.to_csv(csv_path, index=False)
+            
+            # Insert data into database
+            insert_nav(df)
+            logging.info(f"Successfully processed daily data for {latest_date.strftime('%Y-%m-%d')}")
+        else:
+            logging.warning(f"No data found for {latest_date.strftime('%Y-%m-%d')}")
+            
     except Exception as e:
-        with open("logs/error_log.txt", "a") as log:
-            log.write(f"{datetime.now()} - Error: {e}\n")
+        logging.error(f"Error in daily job: {str(e)}")
+        raise
+    finally:
+        duration = datetime.now() - start_time
+        logging.info(f"Daily job completed in {duration}")
 
 def run_monthly_job(months: int = 3):
     """
@@ -166,12 +192,23 @@ def run_monthly_job(months: int = 3):
         
         logging.info("Monthly job completed")
 
+def main():
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description='AMFI NAV Loader - Download and process mutual fund NAV data')
+    parser.add_argument('--months', type=int, default=1, help='Number of months to process (for monthly job). Default: 1')
+    parser.add_argument('--yearly', type=int, default=1, help='Number of years to process (for yearly job). Default: 1')
+    
+    args = parser.parse_args()
+    
+    # Check if yearly argument was explicitly provided
+    if '--yearly' in sys.argv:
+        logging.info(f"Starting yearly job for {args.yearly} years")
+        bulk_download_past_years(args.yearly)
+    # Check if months argument was explicitly provided
+    elif '--months' in sys.argv:
+        run_monthly_job(args.months)
+    else:
+        run_daily_job()
+
 if __name__ == "__main__":
-    # run_daily_job()
-    
-    # Uncomment below to run historical download
-    # from downloader.download_nav import bulk_download_past_years
-    # bulk_download_past_years(15)
-    
-    # Run monthly job for past 3 months
-    run_monthly_job(1)
+    main()

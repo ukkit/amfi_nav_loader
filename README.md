@@ -4,7 +4,7 @@ A Python-based system for automating the download, parsing, and storage of mutua
 
 ## Features
 
-- Automated download of NAV data from AMFI site
+- Automated download of NAV data from AMFI
 - Support for daily, monthly, and yearly data downloads
 - Automatic handling of weekends and holidays
 - Data validation and error handling
@@ -29,7 +29,7 @@ A Python-based system for automating the download, parsing, and storage of mutua
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/ukkit/amfi_nav_loader
+   git clone <repository-url>
    cd amfi_nav_loader
    ```
 
@@ -57,6 +57,58 @@ A Python-based system for automating the download, parsing, and storage of mutua
    docker-compose exec app python -c "from app.db.insert_nav import init_database; init_database()"
    ```
 
+## Usage
+
+### Command Line Arguments
+
+The script supports three modes of operation:
+
+1. **Daily Update** (default, no arguments):
+   ```bash
+   docker-compose exec app python main.py
+   ```
+   This will:
+   - Get the latest business day
+   - Download NAV data for that day
+   - Parse and validate the data
+   - Store it in the database
+
+2. **Monthly Update** (with --months argument):
+   ```bash
+   docker-compose exec app python main.py --months 3
+   ```
+   This will:
+   - Check the earliest date in the database
+   - Download data from that point backwards
+   - Process and store the data
+   - Provide a summary of the operation
+
+3. **Yearly Update** (with --yearly argument):
+   ```bash
+   docker-compose exec app python main.py --yearly 5
+   ```
+   This will:
+   - Download data for the specified number of years
+   - Process and store the data
+   - Provide a summary of the operation
+
+### Examples
+
+1. Run daily update:
+   ```bash
+   docker-compose exec app python main.py
+   ```
+
+2. Run monthly update for past 6 months:
+   ```bash
+   docker-compose exec app python main.py --months 6
+   ```
+
+3. Run yearly update for past 10 years:
+   ```bash
+   docker-compose exec app python main.py --yearly 1
+   ```
+
 ## Directory Structure
 
 ```
@@ -78,37 +130,6 @@ amfi_nav_loader/
 ├── Dockerfile
 └── requirements.txt
 ```
-
-## Usage
-
-### Daily Update
-To download and process the latest NAV data:
-```bash
-docker-compose exec app python app/main.py
-```
-This will:
-1. Get the latest business day
-2. Download NAV data for that day
-3. Parse and validate the data
-4. Store it in the database
-
-### Monthly Update
-To download and process data for the past few months:
-```bash
-docker-compose exec app python app/main.py
-```
-The script will:
-1. Check the earliest date in the database
-2. Download data from that point backwards
-3. Process and store the data
-4. Provide a summary of the operation
-
-### Historical Data
-To download historical data for multiple years:
-```bash
-docker-compose exec app python -c "from app.downloader.download_nav import bulk_download_past_years; bulk_download_past_years(15)"
-```
-This will download data for the past 15 years.
 
 ## Docker Commands
 
@@ -142,25 +163,6 @@ This will download data for the past 15 years.
 - Data files are stored in the `./data` volume
 - Logs are stored in the `./logs` volume
 - Database data is persisted in the `mysql_data` volume
-
-## Download Options
-
-1. **Daily Download**
-   - Downloads data for the latest business day
-   - Skips weekends and holidays automatically
-   - Updates existing records if needed
-
-2. **Monthly Download**
-   - Downloads data for the past specified months
-   - Starts from the earliest date in the database
-   - Fills gaps in historical data
-   - Default is 3 months if not specified
-
-3. **Yearly Download**
-   - Downloads data for multiple years
-   - Useful for initial setup or filling large gaps
-   - Processes data year by year
-   - Maintains data integrity
 
 ## Troubleshooting
 
