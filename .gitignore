@@ -1,5 +1,4 @@
-# Ignore all files in this directory
-*
+
 # Except this .gitignore file
 !.gitignore
 
@@ -43,12 +42,12 @@ venv.bak/
 .DS_Store
 
 # Project specific
-data/*.txt
-data/*.csv
-logs/*.log
-logs/*.txt
-*.log
-*.sqlite
+app/data/*.txt
+app/data/*.csv
+app/logs/*.log
+app/logs/*.txt
+app/*.log
+app/*.sqlite
 
 # Docker
 .docker/
@@ -101,6 +100,8 @@ parts/
 sdist/
 var/
 wheels/
+memory-bank/
+mysql-data/
 *.egg-info/
 .installed.cfg
 *.egg
