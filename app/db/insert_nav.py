@@ -40,8 +40,11 @@ def validate_data(df: pd.DataFrame) -> pd.DataFrame:
     
     # Convert data types and handle invalid values
     try:
+        # Create a copy of the DataFrame to avoid SettingWithCopyWarning
+        df = df.copy()
+        
         # Convert NAV to numeric, handling non-numeric values
-        df['Net Asset Value'] = pd.to_numeric(df['Net Asset Value'], errors='coerce')
+        df.loc[:, 'Net Asset Value'] = pd.to_numeric(df['Net Asset Value'], errors='coerce')
         
         # Log rows with invalid NAV values
         invalid_nav_rows = df[df['Net Asset Value'].isna()]
@@ -54,7 +57,7 @@ def validate_data(df: pd.DataFrame) -> pd.DataFrame:
         df = df.dropna(subset=['Net Asset Value'])
         
         # Convert date to datetime
-        df['Date'] = pd.to_datetime(df['Date'], format='%d-%b-%Y', errors='coerce')
+        df.loc[:, 'Date'] = pd.to_datetime(df['Date'], format='%d-%b-%Y', errors='coerce')
         
         # Log rows with invalid dates
         invalid_date_rows = df[df['Date'].isna()]
@@ -78,7 +81,7 @@ def validate_data(df: pd.DataFrame) -> pd.DataFrame:
         df = df[df['Net Asset Value'] <= max_nav]
         
         # Round NAV values to 4 decimal places
-        df['Net Asset Value'] = df['Net Asset Value'].round(4)
+        df.loc[:, 'Net Asset Value'] = df['Net Asset Value'].round(4)
         
         # Log summary of validation
         logging.info(f"Data validation complete. Remaining rows: {len(df)}")
@@ -243,4 +246,33 @@ def get_earliest_nav_date() -> datetime:
             
     except Exception as e:
         logging.error(f"Error getting earliest NAV date: {str(e)}")
+        raise
+
+def get_latest_nav_date() -> datetime:
+    """
+    Get the latest NAV date from the database.
+    
+    Returns:
+        datetime: The latest date found in the database, or None if no data exists
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        query = "SELECT MAX(nav_date) FROM nav_data"
+        cursor.execute(query)
+        result = cursor.fetchone()[0]
+        
+        cursor.close()
+        conn.close()
+        
+        if result:
+            logging.info(f"Latest NAV date in database: {result}")
+            return result
+        else:
+            logging.warning("No NAV data found in database")
+            return None
+            
+    except Exception as e:
+        logging.error(f"Error getting latest NAV date: {str(e)}")
         raise

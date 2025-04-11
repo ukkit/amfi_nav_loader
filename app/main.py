@@ -1,7 +1,7 @@
 import argparse
 from downloader.download_nav import download_nav_file_for_date, get_latest_business_day, bulk_download_past_years, bulk_download_past_months
 from parser.parse_nav import parse_nav_file
-from db.insert_nav import insert_nav, get_earliest_nav_date
+from db.insert_nav import insert_nav, get_earliest_nav_date, get_latest_nav_date
 from datetime import datetime, timedelta
 import logging
 import os
@@ -21,31 +21,82 @@ logging.basicConfig(
 def run_daily_job():
     """
     Run the daily job to download and process the latest NAV data.
+    Checks for missing days between the latest data in database and yesterday,
+    and downloads data for those missing days.
     """
     start_time = datetime.now()
     logging.info("Starting daily job")
     
     try:
-        # Get the latest business day
-        latest_date = get_latest_business_day(datetime.now())
+        # Get the latest date from database
+        latest_db_date = get_latest_nav_date()
+        if latest_db_date is None:
+            logging.info("No data in database. Starting with yesterday's data.")
+            latest_db_date = get_latest_business_day(datetime.now()).date() - timedelta(days=1)
         
-        # Download NAV file
-        file_path = f"data/navall_{latest_date.strftime('%Y-%m-%d')}.txt"
-        if not os.path.exists(file_path):
-            download_nav_file_for_date(latest_date)
+        # Get yesterday's date
+        yesterday = get_latest_business_day(datetime.now()).date()
         
-        # Process the file
-        df = parse_nav_file(file_path)
-        if df is not None and not df.empty:
-            # Save parsed data to CSV
-            csv_path = file_path.replace('.txt', '.csv')
-            df.to_csv(csv_path, index=False)
+        # Calculate missing days
+        missing_days = []
+        current_date = latest_db_date + timedelta(days=1)
+        while current_date <= yesterday:
+            if current_date.weekday() < 5:  # Only weekdays
+                missing_days.append(current_date)
+            current_date += timedelta(days=1)
+        
+        if not missing_days:
+            logging.info("No missing days found. Database is up to date.")
+            return
             
-            # Insert data into database
-            insert_nav(df)
-            logging.info(f"Successfully processed daily data for {latest_date.strftime('%Y-%m-%d')}")
-        else:
-            logging.warning(f"No data found for {latest_date.strftime('%Y-%m-%d')}")
+        logging.info(f"Found {len(missing_days)} missing days to process")
+        
+        # Process each missing day
+        success_count = 0
+        failed_count = 0
+        failed_dates = []
+        
+        for date in missing_days:
+            try:
+                logging.info(f"Processing data for {date.strftime('%Y-%m-%d')}")
+                
+                # Download NAV file
+                file_path = f"data/navall_{date.strftime('%Y-%m-%d')}.txt"
+                if not os.path.exists(file_path):
+                    download_nav_file_for_date(datetime.combine(date, datetime.min.time()))
+                
+                # Process the file
+                df = parse_nav_file(file_path)
+                if df is not None and not df.empty:
+                    # Save parsed data to CSV
+                    csv_path = file_path.replace('.txt', '.csv')
+                    df.to_csv(csv_path, index=False)
+                    
+                    # Insert data into database
+                    insert_nav(df)
+                    success_count += 1
+                    logging.info(f"Successfully processed data for {date.strftime('%Y-%m-%d')}")
+                else:
+                    logging.warning(f"No data found for {date.strftime('%Y-%m-%d')}")
+                    failed_count += 1
+                    failed_dates.append(date.strftime('%Y-%m-%d'))
+                    
+            except Exception as e:
+                failed_count += 1
+                failed_dates.append(date.strftime('%Y-%m-%d'))
+                logging.error(f"Error processing {date.strftime('%Y-%m-%d')}: {str(e)}")
+        
+        # Print summary
+        duration = datetime.now() - start_time
+        logging.info("\nDaily Job Summary:")
+        logging.info(f"Total days processed: {len(missing_days)}")
+        logging.info(f"Successfully processed: {success_count}")
+        logging.info(f"Failed to process: {failed_count}")
+        if failed_dates:
+            logging.info("Failed dates:")
+            for date in failed_dates:
+                logging.info(f"  - {date}")
+        logging.info(f"Total duration: {duration}")
             
     except Exception as e:
         logging.error(f"Error in daily job: {str(e)}")
